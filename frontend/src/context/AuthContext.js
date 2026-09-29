@@ -51,13 +51,23 @@ export function AuthProvider({ children }) {
     return data.user;
   };
 
+  const forgotPassword = async (email, origin_url) => {
+    const { data } = await api.post("/auth/forgot-password", { email, origin_url });
+    return data;
+  };
+
+  const resetPassword = async (token, password) => {
+    const { data } = await api.post("/auth/reset-password", { token, password });
+    return data;
+  };
+
   const logout = () => {
     localStorage.removeItem("sm41_token");
     setUser(false);
   };
 
   return (
-    <AuthContext.Provider value={{ user, ready, login, register, adminLogin, adminRegister, logout }}>
+    <AuthContext.Provider value={{ user, ready, login, register, adminLogin, adminRegister, forgotPassword, resetPassword, logout }}>
       {children}
     </AuthContext.Provider>
   );

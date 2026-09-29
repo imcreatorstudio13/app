@@ -53,6 +53,9 @@ export default function AdminLogin() {
             Need an admin account?{" "}
             <button type="button" data-testid="to-admin-register" onClick={() => navigate("/admin/register")} className="text-[#D96B43] font-semibold hover:underline">Register</button>
           </p>
+          <div className="text-center">
+            <button type="button" data-testid="admin-forgot" onClick={() => navigate("/forgot-password")} className="text-sm text-[#6B7280] hover:text-[#D96B43]">Forgot password?</button>
+          </div>
         </form>
       </div>
     </div>

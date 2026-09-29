@@ -111,6 +111,27 @@ def _row(label, value):
             f'<td style="padding:6px 0;text-align:right;font-weight:600;color:#1C2120;font-size:14px">{escape(str(value))}</td></tr>')
 
 
+def reset_email_html(name: str, reset_link: str) -> str:
+    greeting = f"Hi {escape(name)}," if name else "Hi,"
+    return (
+        f'<table role="presentation" width="100%" style="background:#FBF9F5;padding:24px">'
+        f'<tr><td align="center">'
+        f'<table role="presentation" width="560" style="background:#FFFFFF;border-radius:12px;overflow:hidden;font-family:Arial,sans-serif">'
+        f'<tr><td style="background:#D96B43;padding:28px 32px">'
+        f'<div style="color:#fff;font-size:13px;letter-spacing:2px;text-transform:uppercase;opacity:.85">Studio Market 41</div>'
+        f'<div style="color:#fff;font-size:24px;font-weight:700;margin-top:6px">Reset your password</div></td></tr>'
+        f'<tr><td style="padding:28px 32px">'
+        f'<p style="color:#1C2120;font-size:15px;line-height:1.6;margin:0 0 18px">{greeting}</p>'
+        f'<p style="color:#1C2120;font-size:15px;line-height:1.6;margin:0 0 22px">We received a request to reset your Studio Market 41 password. Click the button below to choose a new one. This link expires in 1 hour.</p>'
+        f'<a href="{escape(reset_link)}" style="display:inline-block;background:#D96B43;color:#fff;text-decoration:none;font-weight:600;padding:12px 28px;border-radius:9999px">Reset Password</a>'
+        f'<p style="color:#6B7280;font-size:13px;line-height:1.6;margin:22px 0 0">If you did not request this, you can safely ignore this email — your password will not change.</p>'
+        f'</td></tr>'
+        f'<tr><td style="padding:18px 32px;background:#14171A">'
+        f'<p style="color:#9CA3AF;font-size:12px;margin:0">Sent by {escape(EMAIL_FROM_NAME)}. We never ask for your password or card details by email.</p>'
+        f'</td></tr></table></td></tr></table>'
+    )
+
+
 def booking_email_html(booking: dict, for_admin: bool = False) -> str:
     c = booking.get("customer", {})
     stalls = " + ".join(booking.get("stalls", []))

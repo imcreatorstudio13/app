@@ -61,7 +61,18 @@ export default function NavigationHeader() {
               className="px-5 py-2.5 rounded-full bg-[#D96B43] hover:bg-[#C25933] text-white text-sm font-semibold shadow-md hover:shadow-lg transition-all">
               Book Now
             </button>
-            {user && user.role === "user" ? (
+            {user && user.role === "admin" ? (
+              <div className="flex items-center gap-4">
+                <button data-testid="nav-admin-dashboard" onClick={() => go("/admin/dashboard")}
+                  className="inline-flex items-center gap-1.5 text-sm font-medium text-[#2C3531] hover:text-[#D96B43]">
+                  <User size={16} /> Dashboard
+                </button>
+                <button data-testid="nav-admin-logout" onClick={() => { logout(); go("/"); }}
+                  className="inline-flex items-center gap-1.5 text-sm font-medium text-[#6B7280] hover:text-[#EF4444]">
+                  <LogOut size={15} /> Log out
+                </button>
+              </div>
+            ) : user && user.role === "user" ? (
               <div className="flex items-center gap-4">
                 <button data-testid="nav-my-bookings" onClick={() => go("/my-bookings")}
                   className="inline-flex items-center gap-1.5 text-sm font-medium text-[#2C3531] hover:text-[#D96B43]">
@@ -92,7 +103,12 @@ export default function NavigationHeader() {
             <button key={l.to} onClick={() => go(l.to)} className="text-left py-2 text-[#2C3531] font-medium">{l.label}</button>
           ))}
           <button data-testid="book-now-mobile" onClick={() => go("/book")} className="mt-1 px-5 py-3 rounded-full bg-[#D96B43] text-white font-semibold">Book Now</button>
-          {user && user.role === "user" ? (
+          {user && user.role === "admin" ? (
+            <>
+              <button onClick={() => go("/admin/dashboard")} className="text-left py-2 text-[#2C3531] font-medium">Dashboard</button>
+              <button onClick={() => { logout(); go("/"); }} className="text-left py-2 text-[#EF4444] font-medium">Log out</button>
+            </>
+          ) : user && user.role === "user" ? (
             <>
               <button onClick={() => go("/my-bookings")} className="text-left py-2 text-[#2C3531] font-medium">My Bookings</button>
               <button onClick={() => { logout(); go("/"); }} className="text-left py-2 text-[#EF4444] font-medium">Log out</button>

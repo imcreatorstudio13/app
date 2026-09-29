@@ -50,6 +50,9 @@ export default function UserLogin() {
             className="w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-[#D96B43] hover:bg-[#C25933] text-white font-semibold disabled:opacity-50">
             {loading && <Loader2 size={16} className="animate-spin" />} Sign In
           </button>
+          <div className="text-center">
+            <button type="button" data-testid="user-forgot" onClick={() => navigate("/forgot-password")} className="text-sm text-[#6B7280] hover:text-[#D96B43]">Forgot password?</button>
+          </div>
           <p className="text-center text-sm text-[#6B7280]">
             New here?{" "}
             <button type="button" data-testid="to-user-register" onClick={() => navigate("/register")} className="text-[#D96B43] font-semibold hover:underline">Create an account</button>

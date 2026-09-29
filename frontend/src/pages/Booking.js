@@ -62,7 +62,15 @@ export default function Booking() {
   useEffect(() => { api.get("/settings").then((r) => setSettings(r.data)).catch(() => {}); }, []);
 
   useEffect(() => {
-    if (user && user.role === "user") setCust((c) => ({ ...c, full_name: c.full_name || user.name || "", email: c.email || user.email || "" }));
+    if (user && user.role === "user") setCust((c) => ({
+      ...c,
+      full_name: c.full_name || user.name || "",
+      email: c.email || user.email || "",
+      business_name: c.business_name || user.business_name || "",
+      phone: c.phone || user.phone || "",
+      business_description: c.business_description || user.business_description || "",
+      products: c.products || user.products || "",
+    }));
   }, [user]);
 
   const singleOptions = ["A", "B", "C", "D"];

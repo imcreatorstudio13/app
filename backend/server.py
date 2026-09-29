@@ -5,6 +5,7 @@ load_dotenv(ROOT_DIR / '.env')
 
 import os
 import uuid
+import secrets
 import logging
 from datetime import datetime, timezone, date, timedelta
 
@@ -18,7 +19,7 @@ from pydantic import BaseModel, EmailStr, Field
 from typing import List, Optional, Dict, Any
 
 from emergentintegrations.payments.stripe.checkout import StripeCheckout, CheckoutSessionRequest
-from emails import send_email, booking_email_html
+from emails import send_email, booking_email_html, reset_email_html
 
 mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
@@ -265,6 +266,22 @@ class AdminRegisterReq(BaseModel):
     admin_code: str
 
 
+class ForgotPasswordReq(BaseModel):
+    email: EmailStr
+    origin_url: str
+
+
+class ResetPasswordReq(BaseModel):
+    token: str
+    password: str
+
+
+class RescheduleReq(BaseModel):
+    date: str
+    start_hour: Optional[int] = None
+    end_hour: Optional[int] = None
+
+
 class QuoteReq(BaseModel):
     stalls: List[str]
     rental_type: str
@@ -340,7 +357,11 @@ class StallUnavailableReq(BaseModel):
 
 # ---------- auth routes ----------
 def _public_user(u: dict) -> dict:
-    return {"id": u["id"], "email": u["email"], "name": u.get("name", ""), "role": u.get("role", "user")}
+    return {
+        "id": u["id"], "email": u["email"], "name": u.get("name", ""), "role": u.get("role", "user"),
+        "business_name": u.get("business_name", ""), "phone": u.get("phone", ""),
+        "business_description": u.get("business_description", ""), "products": u.get("products", ""),
+    }
 
 
 async def _create_user(name: str, email: str, password: str, role: str) -> dict:
@@ -411,6 +432,79 @@ async def my_bookings(current: dict = Depends(get_current_user)):
     return await db.reservations.find(
         {"user_id": current["id"]}, {"_id": 0, "logo_base64": 0}
     ).sort("created_at", -1).to_list(1000)
+
+
+@api_router.post("/my/bookings/{booking_id}/reschedule")
+async def reschedule_booking(booking_id: str, req: RescheduleReq, current: dict = Depends(get_current_user)):
+    b = await db.reservations.find_one({"id": booking_id}, {"_id": 0})
+    if not b or b.get("user_id") != current["id"]:
+        raise HTTPException(404, "Booking not found")
+    if b["status"] == "cancelled":
+        raise HTTPException(400, "This booking is cancelled and cannot be rescheduled.")
+    settings = await get_settings()
+    d = parse_date(req.date)
+    if d < datetime.now(timezone.utc).date():
+        raise HTTPException(400, "Cannot reschedule to a past date.")
+    start_hour, end_hour = req.start_hour, req.end_hour
+    if b["rental_type"] == "hourly":
+        if start_hour is None or end_hour is None:
+            raise HTTPException(400, "Select a start and end time.")
+        if end_hour - start_hour != b.get("total_hours"):
+            raise HTTPException(400, f"Rescheduled time must keep the same {b.get('total_hours')} hour duration.")
+        hrs = day_hours(d, settings)
+        if start_hour < hrs["open"] or end_hour > hrs["close"]:
+            raise HTTPException(400, "Selected time is outside operating hours.")
+    else:
+        start_hour, end_hour = None, None
+    segments = build_segments(b["rental_type"], d, start_hour, end_hour, settings)
+    conflict = await check_conflicts(b["stalls"], segments, settings, exclude_id=b["id"])
+    if conflict:
+        raise HTTPException(409, conflict)
+    dates = sorted({s["date"] for s in segments})
+    await db.reservations.update_one({"id": booking_id}, {"$set": {
+        "date": req.date, "dates": dates, "start_hour": start_hour, "end_hour": end_hour,
+        "start_label": hour_label(start_hour) if start_hour is not None else "",
+        "end_label": hour_label(end_hour) if end_hour is not None else "",
+        "segments": segments,
+    }})
+    return await db.reservations.find_one({"id": booking_id}, {"_id": 0, "logo_base64": 0})
+
+
+@api_router.post("/auth/forgot-password")
+async def forgot_password(req: ForgotPasswordReq):
+    user = await db.users.find_one({"email": req.email.lower()})
+    if user:
+        token = secrets.token_urlsafe(32)
+        await db.password_reset_tokens.insert_one({
+            "token": token, "user_id": user["id"], "email": user["email"],
+            "expires_at": datetime.now(timezone.utc) + timedelta(hours=1),
+            "used": False, "created_at": datetime.now(timezone.utc),
+        })
+        reset_link = f"{req.origin_url.rstrip('/')}/reset-password?token={token}"
+        try:
+            await send_email(to=user["email"],
+                             subject="Reset your Studio Market 41 password",
+                             html=reset_email_html(user.get("name", ""), reset_link))
+        except Exception as e:
+            logger.error(f"reset email error: {e}")
+    return {"message": "If an account exists for that email, a password reset link has been sent."}
+
+
+@api_router.post("/auth/reset-password")
+async def reset_password(req: ResetPasswordReq):
+    if len(req.password) < 6:
+        raise HTTPException(400, "Password must be at least 6 characters.")
+    rec = await db.password_reset_tokens.find_one({"token": req.token})
+    if not rec or rec.get("used"):
+        raise HTTPException(400, "This reset link is invalid or has already been used.")
+    exp = rec["expires_at"]
+    if getattr(exp, "tzinfo", None) is None:
+        exp = exp.replace(tzinfo=timezone.utc)
+    if exp < datetime.now(timezone.utc):
+        raise HTTPException(400, "This reset link has expired. Please request a new one.")
+    await db.users.update_one({"id": rec["user_id"]}, {"$set": {"password_hash": hash_password(req.password)}})
+    await db.password_reset_tokens.update_one({"token": req.token}, {"$set": {"used": True}})
+    return {"message": "Your password has been updated. You can now log in."}
 
 
 # ---------- settings ----------
@@ -527,6 +621,13 @@ async def create_booking(req: BookingReq, current=Depends(get_optional_user)):
     }
     await db.reservations.insert_one(dict(booking))
     booking.pop("_id", None)
+    if current:
+        await db.users.update_one({"id": current["id"]}, {"$set": {
+            "business_name": req.customer.business_name,
+            "phone": req.customer.phone,
+            "business_description": req.customer.business_description,
+            "products": req.customer.products,
+        }})
     return booking
 
 
@@ -730,6 +831,10 @@ app.add_middleware(
 @app.on_event("startup")
 async def startup():
     await get_settings()
+    try:
+        await db.password_reset_tokens.create_index("expires_at", expireAfterSeconds=0)
+    except Exception as e:
+        logger.error(f"index error: {e}")
     existing = await db.users.find_one({"email": ADMIN_EMAIL.lower()})
     if not existing:
         await db.users.insert_one({

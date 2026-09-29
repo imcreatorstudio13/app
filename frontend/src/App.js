@@ -13,6 +13,8 @@ import AdminDashboard from "@/pages/AdminDashboard";
 import UserLogin from "@/pages/UserLogin";
 import UserRegister from "@/pages/UserRegister";
 import MyBookings from "@/pages/MyBookings";
+import ForgotPassword from "@/pages/ForgotPassword";
+import ResetPassword from "@/pages/ResetPassword";
 
 function App() {
   return (
@@ -27,6 +29,8 @@ function App() {
             <Route path="/payment/cancel" element={<PaymentCancel />} />
             <Route path="/login" element={<UserLogin />} />
             <Route path="/register" element={<UserRegister />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/my-bookings" element={<MyBookings />} />
             <Route path="/admin" element={<Navigate to="/admin/login" replace />} />
             <Route path="/admin/login" element={<AdminLogin />} />
