@@ -34,7 +34,7 @@ export default function NavigationHeader() {
     <header
       data-testid="site-header"
       className={`fixed top-0 inset-x-0 z-50 transition-all duration-300 ${
-        scrolled ? "bg-[#FBF9F5]/90 backdrop-blur-xl border-b border-[#E5E0D8] shadow-sm" : "bg-transparent"
+        scrolled ? "bg-[#FBF9F5]/90 backdrop-blur-xl border-b border-[#E5E0D8] shadow-sm" : "bg-[#FBF9F5]/80 backdrop-blur-md"
       }`}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
