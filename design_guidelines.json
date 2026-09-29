@@ -1,0 +1,106 @@
+{
+  "project_name": "Studio Market 41",
+  "app_type": "hybrid_fullstack",
+  "archetype": "Organic Urban Craft & Retail Architecture",
+  "emotional_tone": "Artisanal, high-trust, friction-free, modern Soho boutique space",
+  "design_principles": [
+    "Fusion over Imitation: Soho urban boutique meets precision architectural venue booking",
+    "Emotion First: Warm earthy tones and tactile finishes evoke craftsmanship and vendor success",
+    "Content is King: Dynamic interactive stall floorplan with real-time slot blocking and zero ambiguity",
+    "Friction-Free Workflow: Clear multi-step wizard guiding vendors from stall selection to Stripe payment",
+    "Dense yet Breathable Admin: Executive control panel with immediate rate editing, blockouts, and reservation lifecycle management"
+  ],
+  "colors": {
+    "background_light": "#FBF9F5",
+    "background_card": "#FFFFFF",
+    "background_dark": "#14171A",
+    "primary": "#D96B43",
+    "primary_hover": "#C25933",
+    "secondary": "#2C3531",
+    "accent_sage": "#5C6B57",
+    "accent_amber": "#E5A93C",
+    "text_main": "#1C2120",
+    "text_muted": "#6B7280",
+    "border_subtle": "#E5E0D8",
+    "status_available": "#10B981",
+    "status_booked": "#EF4444",
+    "status_blocked": "#F59E0B",
+    "status_selected": "#D96B43"
+  },
+  "typography": {
+    "heading_font": "Outfit, sans-serif",
+    "body_font": "Inter, system-ui, sans-serif",
+    "mono_font": "JetBrains Mono, monospace",
+    "scale": {
+      "h1": "text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-[#1C2120]",
+      "h2": "text-2xl sm:text-3xl lg:text-4xl font-semibold tracking-tight text-[#1C2120]",
+      "h3": "text-xl sm:text-2xl font-semibold text-[#1C2120]",
+      "h4": "text-lg font-medium text-[#1C2120]",
+      "body": "text-base leading-relaxed text-[#1C2120]",
+      "small": "text-sm text-gray-500",
+      "eyebrow": "text-xs font-bold uppercase tracking-widest text-[#D96B43]"
+    }
+  },
+  "layout_and_grid": {
+    "container": "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8",
+    "spacing_scale": "Generous Spacing System: py-12 md:py-20 for sections, gap-6 md:gap-8 for grids, p-6 or p-8 for cards",
+    "stall_map_grid": "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6",
+    "bento_features_grid": "grid grid-cols-1 md:grid-cols-3 lg:grid-cols-12 gap-6"
+  },
+  "key_components_to_build": [
+    {
+      "name": "NavigationHeader",
+      "path": "src/components/NavigationHeader.js",
+      "description": "Sticky blurred header with Studio Market 41 branding, live operating status indicator, nav links (About, Stalls & Pricing, Book Stall, FAQs, Admin Dashboard), and Book Now CTA button."
+    },
+    {
+      "name": "HeroSection",
+      "path": "src/components/HeroSection.js",
+      "description": "High-impact Soho style headline, key venue highlights (Central location, High foot traffic, Flexible hourly/daily/weekly rates, Plug & play setup), and interactive Quick-Start Stall Finder."
+    },
+    {
+      "name": "InteractiveStallMap",
+      "path": "src/components/InteractiveStallMap.js",
+      "description": "Visual floorplan representation of Stalls A, B, C, D and adjoining combos (A+B, C+D). Shows dimensions (e.g., 10x10 ft), included amenities, power outlets, and live availability toggles."
+    },
+    {
+      "name": "BookingWizard",
+      "path": "src/components/BookingWizard.js",
+      "description": "Multi-step interactive vendor checkout: Step 1: Stall & Combo Selection; Step 2: Rental Plan & Rates (Hourly $10/hr with 4-hr min, Daily, Mon-Fri Grand Opening Special, Mon-Sun Weekly); Step 3: Date & Time Picker (Live calendar with Mon-Fri 7AM-9PM, Sat-Sun 7AM-10PM slots, blocked slot enforcement); Step 4: Vendor Profile & Requirements (Business details, category, logo upload dropzone, electrical power & furniture add-ons); Step 5: Terms & Cancellation Policy Verification; Step 6: Secure Stripe Payment simulation; Step 7: Confirmation & QR Badge."
+    },
+    {
+      "name": "AdminDashboard",
+      "path": "src/components/AdminDashboard.js",
+      "description": "Full admin portal to edit hourly/daily/weekly rates, update operating hours, block custom dates/time slots, toggle booth availability (maintenance modes), search/view/edit/cancel vendor reservations, and update T&C text."
+    },
+    {
+      "name": "ReservationConfirmation",
+      "path": "src/components/ReservationConfirmation.js",
+      "description": "Vibrant post-checkout receipt with unique reference code, QR code for vendor check-in, load-in instructions, print/download PDF trigger, and simulated confirmation email preview modal."
+    }
+  ],
+  "image_urls": {
+    "hero_market": "https://images.unsplash.com/photo-1759323321196-2813db509285?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMjd8MHwxfHNlYXJjaHxfc3R1ZGlvX21hcmtldF8x",
+    "stall_interior_1": "https://images.unsplash.com/photo-1765902763477-f7d0f942743c?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1ODh8MHwxfHNlYXJjaHwy",
+    "stall_interior_2": "https://images.pexels.com/photos/16063720/pexels-photo-16063720.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+    "vendor_artisan": "https://images.unsplash.com/photo-1780767571176-6e173e76593d?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1ODh8MHwxfHNlYXJjaHxfc3R1ZGlvX21hcmtldF8z",
+    "arcade_hall": "https://images.unsplash.com/photo-1781450039675-9cb6c6dd756f?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMjd8MHwxfHNlYXJjaHwzfH"
+  },
+  "interactive_rules": {
+    "stall_combo_logic": "Selecting Stall A+B locks Stalls A and B. Selecting Stall C+D locks Stalls C and D. Individual stalls A, B, C, D can be selected independently unless already booked or part of an active combo booking.",
+    "hourly_min_constraint": "Hourly rental requires minimum 4 consecutive hours. Input validation must enforce end_time - start_time >= 4 hours during hourly mode.",
+    "operating_hours": {
+      "mon_fri": "07:00 - 21:00",
+      "sat_sun": "07:00 - 22:00"
+    },
+    "stripe_mock": "Provide realistic Stripe Element card entry simulation with auto-fill test card option (4242 4242 4242 4242) and live total breakdown calculation."
+  },
+  "instructions_to_main_agent": [
+    "Ensure all interactive components (buttons, tabs, stall cards, inputs, date pickers, admin toggles) include explicit data-testid attributes.",
+    "Do NOT use transparent backgrounds for dropdowns, headers, or modals — use glassmorphism with backdrop blur and white/dark opacity or solid background.",
+    "Ensure hourly slot validation strictly blocks booked slots and admin-blocked dates.",
+    "Provide clear visual cues on the floorplan map when switching between single stalls and combo stalls.",
+    "Include sonner toast notifications for booking actions, admin rate updates, blockout saves, and reservation cancellations.",
+    "Keep styling responsive with mobile-first layouts so vendors can easily book on smartphone devices."
+  ]
+}
