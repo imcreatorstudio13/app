@@ -95,13 +95,16 @@ export default function Booking() {
 
   const clickHour = (h) => {
     if (!hourAvailable(h)) return;
-    if (startHour === null || (startHour !== null && endHour !== null)) {
+    // no start yet, or clicking before current start → begin a new selection here
+    if (startHour === null || h < startHour) {
       setStartHour(h); setEndHour(h + 1); return;
     }
-    if (h < startHour) { setStartHour(h); setEndHour(h + 1); return; }
-    // extend to h+1 if contiguous available
-    if (rangeAvailable(startHour, h + 1)) setEndHour(h + 1);
-    else { setStartHour(h); setEndHour(h + 1); }
+    // clicking at/after start → extend to h+1 if the whole span is available
+    if (rangeAvailable(startHour, h + 1)) {
+      setEndHour(h + 1);
+    } else {
+      setStartHour(h); setEndHour(h + 1);
+    }
   };
 
   const hours = useMemo(() => {
