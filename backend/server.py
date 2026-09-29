@@ -6,11 +6,14 @@ load_dotenv(ROOT_DIR / '.env')
 import os
 import uuid
 import secrets
+import asyncio
+import hmac
 import logging
 from datetime import datetime, timezone, date, timedelta
 
 import bcrypt
 import jwt
+import stripe
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from starlette.middleware.cors import CORSMiddleware
@@ -19,7 +22,7 @@ from pydantic import BaseModel, EmailStr, Field
 from typing import List, Optional, Dict, Any
 
 from emergentintegrations.payments.stripe.checkout import StripeCheckout, CheckoutSessionRequest
-from emails import send_email, booking_email_html, reset_email_html
+from emails import send_email, booking_email_html, reset_email_html, verify_email_html, reminder_email_html
 
 mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
@@ -32,6 +35,8 @@ ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'admin123')
 OWNER_EMAIL = os.environ.get('OWNER_EMAIL', ADMIN_EMAIL)
 ADMIN_REGISTER_CODE = os.environ.get('ADMIN_REGISTER_CODE', 'STUDIO41-OWNER')
 STRIPE_API_KEY = os.environ.get('STRIPE_API_KEY', 'sk_test_emergent')
+stripe.api_key = STRIPE_API_KEY
+WEBHOOK_CRON_SECRET = os.environ.get('WEBHOOK_CRON_SECRET', '')
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -257,6 +262,15 @@ class RegisterReq(BaseModel):
     email: EmailStr
     password: str
     phone: str = ""
+    origin_url: Optional[str] = None
+
+
+class VerifyEmailReq(BaseModel):
+    token: str
+
+
+class ResendVerifyReq(BaseModel):
+    origin_url: str
 
 
 class AdminRegisterReq(BaseModel):
@@ -280,6 +294,7 @@ class RescheduleReq(BaseModel):
     date: str
     start_hour: Optional[int] = None
     end_hour: Optional[int] = None
+    origin_url: Optional[str] = None
 
 
 class QuoteReq(BaseModel):
@@ -359,12 +374,13 @@ class StallUnavailableReq(BaseModel):
 def _public_user(u: dict) -> dict:
     return {
         "id": u["id"], "email": u["email"], "name": u.get("name", ""), "role": u.get("role", "user"),
+        "email_verified": u.get("email_verified", False),
         "business_name": u.get("business_name", ""), "phone": u.get("phone", ""),
         "business_description": u.get("business_description", ""), "products": u.get("products", ""),
     }
 
 
-async def _create_user(name: str, email: str, password: str, role: str) -> dict:
+async def _create_user(name: str, email: str, password: str, role: str, verified: bool = False) -> dict:
     email = email.lower()
     if len(password) < 6:
         raise HTTPException(400, "Password must be at least 6 characters.")
@@ -376,6 +392,7 @@ async def _create_user(name: str, email: str, password: str, role: str) -> dict:
         "password_hash": hash_password(password),
         "name": name,
         "role": role,
+        "email_verified": verified,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     await db.users.insert_one(dict(doc))
@@ -384,9 +401,11 @@ async def _create_user(name: str, email: str, password: str, role: str) -> dict:
 
 @api_router.post("/auth/register")
 async def register(req: RegisterReq):
-    user = await _create_user(req.name, req.email, req.password, "user")
+    user = await _create_user(req.name, req.email, req.password, "user", verified=False)
     if req.phone:
         await db.users.update_one({"id": user["id"]}, {"$set": {"phone": req.phone}})
+    if req.origin_url:
+        await _send_verify_email(user, req.origin_url)
     token = create_token(user["id"], user["email"], "user")
     return {"token": token, "user": _public_user(user)}
 
@@ -406,7 +425,7 @@ async def login(req: LoginReq):
 async def admin_register(req: AdminRegisterReq):
     if req.admin_code != ADMIN_REGISTER_CODE:
         raise HTTPException(403, "Invalid admin registration code.")
-    user = await _create_user(req.name, req.email, req.password, "admin")
+    user = await _create_user(req.name, req.email, req.password, "admin", verified=True)
     token = create_token(user["id"], user["email"], "admin")
     return {"token": token, "user": _public_user(user)}
 
@@ -505,6 +524,29 @@ async def reset_password(req: ResetPasswordReq):
     await db.users.update_one({"id": rec["user_id"]}, {"$set": {"password_hash": hash_password(req.password)}})
     await db.password_reset_tokens.update_one({"token": req.token}, {"$set": {"used": True}})
     return {"message": "Your password has been updated. You can now log in."}
+
+
+@api_router.post("/auth/verify-email")
+async def verify_email(req: VerifyEmailReq):
+    rec = await db.email_verify_tokens.find_one({"token": req.token})
+    if not rec or rec.get("used"):
+        raise HTTPException(400, "This verification link is invalid or has already been used.")
+    exp = rec["expires_at"]
+    if getattr(exp, "tzinfo", None) is None:
+        exp = exp.replace(tzinfo=timezone.utc)
+    if exp < datetime.now(timezone.utc):
+        raise HTTPException(400, "This verification link has expired. Please request a new one.")
+    await db.users.update_one({"id": rec["user_id"]}, {"$set": {"email_verified": True}})
+    await db.email_verify_tokens.update_one({"token": req.token}, {"$set": {"used": True}})
+    return {"message": "Your email is verified. Thank you!"}
+
+
+@api_router.post("/auth/resend-verification")
+async def resend_verification(req: ResendVerifyReq, current: dict = Depends(get_current_user)):
+    if current.get("email_verified"):
+        return {"message": "Your email is already verified."}
+    await _send_verify_email(current, req.origin_url)
+    return {"message": "Verification email sent. Please check your inbox."}
 
 
 # ---------- settings ----------
@@ -644,6 +686,75 @@ def stripe_client(request: Request) -> StripeCheckout:
     host_url = str(request.base_url)
     webhook_url = f"{host_url}api/webhook/stripe"
     return StripeCheckout(api_key=STRIPE_API_KEY, webhook_url=webhook_url)
+
+
+async def _do_refund(booking: dict, amount: float) -> float:
+    """Refund `amount` dollars against the booking's original checkout session. Returns dollars refunded."""
+    if amount <= 0 or not booking.get("session_id"):
+        return 0.0
+
+    def _run():
+        sess = stripe.checkout.Session.retrieve(booking["session_id"])
+        pi = sess.get("payment_intent") if isinstance(sess, dict) else sess.payment_intent
+        if not pi:
+            return None
+        return stripe.Refund.create(payment_intent=pi, amount=int(round(amount * 100)))
+
+    try:
+        res = await asyncio.to_thread(_run)
+        return round(amount, 2) if res else 0.0
+    except Exception as e:
+        logger.error(f"refund error: {e}")
+        return 0.0
+
+
+def booking_start_dt(b: dict, settings: dict) -> datetime:
+    first = min(b.get("dates") or [b.get("date")])
+    d = parse_date(first)
+    if b.get("rental_type") == "hourly" and b.get("start_hour") is not None:
+        h = b["start_hour"]
+    else:
+        h = day_hours(d, settings)["open"]
+    return datetime(d.year, d.month, d.day, h, tzinfo=timezone.utc)
+
+
+def refund_amount_for(b: dict, settings: dict) -> float:
+    if b.get("payment_status") != "paid":
+        return 0.0
+    paid = float(b.get("total", 0))
+    now = datetime.now(timezone.utc)
+    start = booking_start_dt(b, settings)
+    if now >= start:
+        return 0.0
+    if (start - now) >= timedelta(hours=48):
+        return round(paid, 2)
+    return round(paid * 0.7, 2)
+
+
+async def _cancel_booking(b: dict) -> float:
+    settings = await get_settings()
+    refunded = await _do_refund(b, refund_amount_for(b, settings))
+    await db.reservations.update_one({"id": b["id"]}, {"$set": {
+        "status": "cancelled", "refund_amount": refunded,
+        "cancelled_at": datetime.now(timezone.utc).isoformat(),
+    }})
+    return refunded
+
+
+async def _send_verify_email(user: dict, origin_url: str):
+    token = secrets.token_urlsafe(32)
+    await db.email_verify_tokens.insert_one({
+        "token": token, "user_id": user["id"], "email": user["email"],
+        "expires_at": datetime.now(timezone.utc) + timedelta(days=3),
+        "used": False, "created_at": datetime.now(timezone.utc),
+    })
+    link = f"{origin_url.rstrip('/')}/verify-email?token={token}"
+    try:
+        await send_email(to=user["email"],
+                         subject="Verify your Studio Market 41 email",
+                         html=verify_email_html(user.get("name", ""), link))
+    except Exception as e:
+        logger.error(f"verify email error: {e}")
 
 
 async def _finalize_paid(booking: dict):
