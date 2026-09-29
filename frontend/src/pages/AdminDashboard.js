@@ -24,7 +24,7 @@ export default function AdminDashboard() {
   const [blocked, setBlocked] = useState({ dates: [], slots: [], unavailable: [] });
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => { if (ready && !user) navigate("/admin", { replace: true }); }, [ready, user, navigate]);
+  useEffect(() => { if (ready && (!user || user.role !== "admin")) navigate("/admin/login", { replace: true }); }, [ready, user, navigate]);
 
   const load = async () => {
     try {
@@ -59,7 +59,7 @@ export default function AdminDashboard() {
               <div className="text-xs text-white/50 mt-1">Admin Dashboard</div>
             </div>
           </div>
-          <button data-testid="logout-btn" onClick={() => { logout(); navigate("/admin"); }}
+          <button data-testid="logout-btn" onClick={() => { logout(); navigate("/admin/login"); }}
             className="inline-flex items-center gap-2 text-sm text-white/70 hover:text-white"><LogOut size={16} /> Sign out</button>
         </div>
       </div>

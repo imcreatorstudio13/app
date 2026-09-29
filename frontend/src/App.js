@@ -1,5 +1,5 @@
 import "@/App.css";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/context/AuthContext";
 import Home from "@/pages/Home";
@@ -8,7 +8,11 @@ import Confirmation from "@/pages/Confirmation";
 import PaymentSuccess from "@/pages/PaymentSuccess";
 import PaymentCancel from "@/pages/PaymentCancel";
 import AdminLogin from "@/pages/AdminLogin";
+import AdminRegister from "@/pages/AdminRegister";
 import AdminDashboard from "@/pages/AdminDashboard";
+import UserLogin from "@/pages/UserLogin";
+import UserRegister from "@/pages/UserRegister";
+import MyBookings from "@/pages/MyBookings";
 
 function App() {
   return (
@@ -21,7 +25,12 @@ function App() {
             <Route path="/confirmation/:id" element={<Confirmation />} />
             <Route path="/payment/success" element={<PaymentSuccess />} />
             <Route path="/payment/cancel" element={<PaymentCancel />} />
-            <Route path="/admin" element={<AdminLogin />} />
+            <Route path="/login" element={<UserLogin />} />
+            <Route path="/register" element={<UserRegister />} />
+            <Route path="/my-bookings" element={<MyBookings />} />
+            <Route path="/admin" element={<Navigate to="/admin/login" replace />} />
+            <Route path="/admin/login" element={<AdminLogin />} />
+            <Route path="/admin/register" element={<AdminRegister />} />
             <Route path="/admin/dashboard" element={<AdminDashboard />} />
           </Routes>
         </BrowserRouter>

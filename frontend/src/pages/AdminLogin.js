@@ -6,19 +6,19 @@ import { useAuth } from "@/context/AuthContext";
 import { apiError } from "@/lib/api";
 
 export default function AdminLogin() {
-  const { user, ready, login } = useAuth();
+  const { user, ready, adminLogin } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => { if (ready && user) navigate("/admin/dashboard", { replace: true }); }, [ready, user, navigate]);
+  useEffect(() => { if (ready && user && user.role === "admin") navigate("/admin/dashboard", { replace: true }); }, [ready, user, navigate]);
 
   const submit = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
-      await login(email, password);
+      await adminLogin(email, password);
       toast.success("Welcome back");
       navigate("/admin/dashboard");
     } catch (err) {
@@ -49,6 +49,10 @@ export default function AdminLogin() {
             className="w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-[#D96B43] hover:bg-[#C25933] text-white font-semibold disabled:opacity-50">
             {loading ? <Loader2 size={16} className="animate-spin" /> : <Lock size={16} />} Sign In
           </button>
+          <p className="text-center text-sm text-[#6B7280]">
+            Need an admin account?{" "}
+            <button type="button" data-testid="to-admin-register" onClick={() => navigate("/admin/register")} className="text-[#D96B43] font-semibold hover:underline">Register</button>
+          </p>
         </form>
       </div>
     </div>

@@ -29,6 +29,7 @@ JWT_ALGORITHM = "HS256"
 ADMIN_EMAIL = os.environ.get('ADMIN_EMAIL', 'admin@example.com')
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'admin123')
 OWNER_EMAIL = os.environ.get('OWNER_EMAIL', ADMIN_EMAIL)
+ADMIN_REGISTER_CODE = os.environ.get('ADMIN_REGISTER_CODE', 'STUDIO41-OWNER')
 STRIPE_API_KEY = os.environ.get('STRIPE_API_KEY', 'sk_test_emergent')
 
 logging.basicConfig(level=logging.INFO)
@@ -84,24 +85,44 @@ def verify_password(pw: str, hashed: str) -> bool:
         return False
 
 
-def create_token(user_id: str, email: str) -> str:
-    payload = {"sub": user_id, "email": email,
+def create_token(user_id: str, email: str, role: str = "user") -> str:
+    payload = {"sub": user_id, "email": email, "role": role,
                "exp": datetime.now(timezone.utc) + timedelta(days=7), "type": "access"}
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
 
-async def get_admin(creds: Optional[HTTPAuthorizationCredentials] = Depends(security)) -> dict:
+async def _user_from_creds(creds: Optional[HTTPAuthorizationCredentials]):
     if not creds:
-        raise HTTPException(401, "Not authenticated")
+        return None
     try:
         payload = jwt.decode(creds.credentials, JWT_SECRET, algorithms=[JWT_ALGORITHM])
     except jwt.ExpiredSignatureError:
         raise HTTPException(401, "Token expired")
     except jwt.InvalidTokenError:
         raise HTTPException(401, "Invalid token")
-    user = await db.users.find_one({"id": payload["sub"]}, {"_id": 0, "password_hash": 0})
+    return await db.users.find_one({"id": payload["sub"]}, {"_id": 0, "password_hash": 0})
+
+
+async def get_current_user(creds: Optional[HTTPAuthorizationCredentials] = Depends(security)) -> dict:
+    user = await _user_from_creds(creds)
     if not user:
-        raise HTTPException(401, "User not found")
+        raise HTTPException(401, "Not authenticated")
+    return user
+
+
+async def get_optional_user(creds: Optional[HTTPAuthorizationCredentials] = Depends(security)):
+    try:
+        return await _user_from_creds(creds)
+    except HTTPException:
+        return None
+
+
+async def get_admin(creds: Optional[HTTPAuthorizationCredentials] = Depends(security)) -> dict:
+    user = await _user_from_creds(creds)
+    if not user:
+        raise HTTPException(401, "Not authenticated")
+    if user.get("role") != "admin":
+        raise HTTPException(403, "Admin access required")
     return user
 
 
@@ -230,6 +251,20 @@ class LoginReq(BaseModel):
     password: str
 
 
+class RegisterReq(BaseModel):
+    name: str
+    email: EmailStr
+    password: str
+    phone: str = ""
+
+
+class AdminRegisterReq(BaseModel):
+    name: str
+    email: EmailStr
+    password: str
+    admin_code: str
+
+
 class QuoteReq(BaseModel):
     stalls: List[str]
     rental_type: str
@@ -304,18 +339,78 @@ class StallUnavailableReq(BaseModel):
 
 
 # ---------- auth routes ----------
+def _public_user(u: dict) -> dict:
+    return {"id": u["id"], "email": u["email"], "name": u.get("name", ""), "role": u.get("role", "user")}
+
+
+async def _create_user(name: str, email: str, password: str, role: str) -> dict:
+    email = email.lower()
+    if len(password) < 6:
+        raise HTTPException(400, "Password must be at least 6 characters.")
+    if await db.users.find_one({"email": email}):
+        raise HTTPException(409, "An account with this email already exists.")
+    doc = {
+        "id": str(uuid.uuid4()),
+        "email": email,
+        "password_hash": hash_password(password),
+        "name": name,
+        "role": role,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.users.insert_one(dict(doc))
+    return doc
+
+
+@api_router.post("/auth/register")
+async def register(req: RegisterReq):
+    user = await _create_user(req.name, req.email, req.password, "user")
+    if req.phone:
+        await db.users.update_one({"id": user["id"]}, {"$set": {"phone": req.phone}})
+    token = create_token(user["id"], user["email"], "user")
+    return {"token": token, "user": _public_user(user)}
+
+
 @api_router.post("/auth/login")
 async def login(req: LoginReq):
     user = await db.users.find_one({"email": req.email.lower()})
     if not user or not verify_password(req.password, user["password_hash"]):
         raise HTTPException(401, "Invalid email or password")
-    token = create_token(user["id"], user["email"])
-    return {"token": token, "user": {"id": user["id"], "email": user["email"], "name": user.get("name", "Admin")}}
+    if user.get("role") == "admin":
+        raise HTTPException(403, "This is an admin account. Please use the admin login page.")
+    token = create_token(user["id"], user["email"], user.get("role", "user"))
+    return {"token": token, "user": _public_user(user)}
+
+
+@api_router.post("/auth/admin/register")
+async def admin_register(req: AdminRegisterReq):
+    if req.admin_code != ADMIN_REGISTER_CODE:
+        raise HTTPException(403, "Invalid admin registration code.")
+    user = await _create_user(req.name, req.email, req.password, "admin")
+    token = create_token(user["id"], user["email"], "admin")
+    return {"token": token, "user": _public_user(user)}
+
+
+@api_router.post("/auth/admin/login")
+async def admin_login(req: LoginReq):
+    user = await db.users.find_one({"email": req.email.lower()})
+    if not user or not verify_password(req.password, user["password_hash"]):
+        raise HTTPException(401, "Invalid email or password")
+    if user.get("role") != "admin":
+        raise HTTPException(403, "This account does not have admin access.")
+    token = create_token(user["id"], user["email"], "admin")
+    return {"token": token, "user": _public_user(user)}
 
 
 @api_router.get("/auth/me")
-async def me(admin: dict = Depends(get_admin)):
-    return admin
+async def me(current: dict = Depends(get_current_user)):
+    return current
+
+
+@api_router.get("/my/bookings")
+async def my_bookings(current: dict = Depends(get_current_user)):
+    return await db.reservations.find(
+        {"user_id": current["id"]}, {"_id": 0, "logo_base64": 0}
+    ).sort("created_at", -1).to_list(1000)
 
 
 # ---------- settings ----------
@@ -377,7 +472,7 @@ async def quote(req: QuoteReq):
 
 # ---------- bookings ----------
 @api_router.post("/bookings")
-async def create_booking(req: BookingReq):
+async def create_booking(req: BookingReq, current=Depends(get_optional_user)):
     settings = await get_settings()
     validate_stalls(req.stalls)
     if not (req.agreements_accepted and req.cancellation_accepted and req.terms_accepted):
@@ -402,6 +497,7 @@ async def create_booking(req: BookingReq):
     booking = {
         "id": str(uuid.uuid4()),
         "confirmation_code": "SM41-" + uuid.uuid4().hex[:6].upper(),
+        "user_id": current["id"] if current else None,
         "status": "pending",
         "stalls": req.stalls,
         "rental_type": req.rental_type,

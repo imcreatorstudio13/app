@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Store, Menu, X } from "lucide-react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { Store, Menu, X, User, LogOut, CalendarCheck } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
 
 const links = [
   { to: "/#about", label: "About" },
   { to: "/#stalls", label: "Stalls & Pricing" },
   { to: "/#faq", label: "FAQ" },
-  { to: "/admin", label: "Admin" },
 ];
 
 export default function NavigationHeader() {
@@ -14,6 +14,7 @@ export default function NavigationHeader() {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
   const loc = useLocation();
+  const { user, logout } = useAuth();
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
@@ -60,6 +61,23 @@ export default function NavigationHeader() {
               className="px-5 py-2.5 rounded-full bg-[#D96B43] hover:bg-[#C25933] text-white text-sm font-semibold shadow-md hover:shadow-lg transition-all">
               Book Now
             </button>
+            {user && user.role === "user" ? (
+              <div className="flex items-center gap-4">
+                <button data-testid="nav-my-bookings" onClick={() => go("/my-bookings")}
+                  className="inline-flex items-center gap-1.5 text-sm font-medium text-[#2C3531] hover:text-[#D96B43]">
+                  <CalendarCheck size={16} /> My Bookings
+                </button>
+                <button data-testid="nav-logout" onClick={() => { logout(); go("/"); }}
+                  className="inline-flex items-center gap-1.5 text-sm font-medium text-[#6B7280] hover:text-[#EF4444]">
+                  <LogOut size={15} /> Log out
+                </button>
+              </div>
+            ) : (
+              <button data-testid="nav-login" onClick={() => go("/login")}
+                className="inline-flex items-center gap-1.5 text-sm font-medium text-[#2C3531] hover:text-[#D96B43]">
+                <User size={16} /> Log in
+              </button>
+            )}
           </nav>
 
           <button data-testid="mobile-menu-btn" className="md:hidden text-[#1C2120]" onClick={() => setOpen(!open)}>
@@ -74,6 +92,14 @@ export default function NavigationHeader() {
             <button key={l.to} onClick={() => go(l.to)} className="text-left py-2 text-[#2C3531] font-medium">{l.label}</button>
           ))}
           <button data-testid="book-now-mobile" onClick={() => go("/book")} className="mt-1 px-5 py-3 rounded-full bg-[#D96B43] text-white font-semibold">Book Now</button>
+          {user && user.role === "user" ? (
+            <>
+              <button onClick={() => go("/my-bookings")} className="text-left py-2 text-[#2C3531] font-medium">My Bookings</button>
+              <button onClick={() => { logout(); go("/"); }} className="text-left py-2 text-[#EF4444] font-medium">Log out</button>
+            </>
+          ) : (
+            <button onClick={() => go("/login")} className="text-left py-2 text-[#2C3531] font-medium">Log in</button>
+          )}
         </div>
       )}
     </header>

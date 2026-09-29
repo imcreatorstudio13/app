@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { ArrowLeft, ArrowRight, Check, Store, Clock, CalendarDays, User, FileCheck, CreditCard, Loader2, Upload } from "lucide-react";
 import api, { apiError } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 
 const STEPS = [
   { id: 0, label: "Stalls", icon: Store },
@@ -30,6 +31,7 @@ function mondayOf(dstr) {
 
 export default function Booking() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [settings, setSettings] = useState(null);
   const [step, setStep] = useState(0);
   const [submitting, setSubmitting] = useState(false);
@@ -58,6 +60,10 @@ export default function Booking() {
   const [quote, setQuote] = useState(null);
 
   useEffect(() => { api.get("/settings").then((r) => setSettings(r.data)).catch(() => {}); }, []);
+
+  useEffect(() => {
+    if (user && user.role === "user") setCust((c) => ({ ...c, full_name: c.full_name || user.name || "", email: c.email || user.email || "" }));
+  }, [user]);
 
   const singleOptions = ["A", "B", "C", "D"];
   const comboOptions = [["A", "B"], ["C", "D"]];
